@@ -5,89 +5,18 @@ const moment = require('moment')
 const nodemon = require('nodemon')
 const bodyParser = require('body-parser')
 const config = require('./config')
-const { env } = process
+require('dotenv').config()
 
 // Base URL API endpoint. Do not edit!
-const API_URL = env.API_URL || 'https://api.wassenger.com/v1'
+const API_URL = process.env.API_URL || 'https://api.wassenger.com/v1'
 
 // Create web server
-const app = express()
+const app = express();
+
 
 // Middleware to parse incoming request bodies
-app.use(bodyParser.json())
+app.use(bodyParser.json());
 
-// Index route
-app.get('/', (req, res) => {
-  res.send({
-    name: 'chatbot',
-    description: 'Simple WhatsApp chatbot for Wassenger',
-    endpoints: {
-      webhook: {
-        path: '/webhook',
-        method: 'POST'
-      },
-      sendMessage: {
-        path: '/message',
-        method: 'POST'
-      },
-      sample: {
-        path: '/sample',
-        method: 'GET'
-      }
-    }
-  })
-})
-
-// POST route to handle incoming webhook messages
-app.post('/webhook', (req, res) => {
-  const { body } = req
-  if (!body || !body.event || !body.data) {
-    return res.status(400).send({ message: 'Invalid payload body' })
-  }
-  if (body.event !== 'message:in:new') {
-    return res.status(202).send({ message: 'Ignore webhook event: only message:in:new is accepted' })
-  }
-
-  res.send({ ok: true })
-
-  // Process message in background
-  processMessage(body).catch(err => {
-    console.error('[error] failed to process inbound message:', body.id, body.data.fromNumber, body.data.body, err)
-  })
-})
-
-// Send message on demand
-app.post('/message', (req, res) => {
-  const { body } = req
-  if (!body || !body.phone || !body.message) {
-    return res.status(400).send({ message: 'Invalid payload body' })
-  }
-
-  sendMessage(body).then((data) => {
-    res.send(data)
-  }).catch(err => {
-    res.status(+err.status || 500).send(err.response ? err.response.data : {
-      message: 'Failed to send message'
-    })
-  })
-})
-
-// Send a sample message to your own number, or to a number specified in the query string
-app.get('/sample', (req, res) => {
-  const { phone, message } = req.query
-  const data = {
-    phone: phone || app.device.phone,
-    message: message || 'Hello World from Wassenger!',
-    device: app.device.id
-  }
-  sendMessage(data).then((data) => {
-    res.send(data)
-  }).catch(err => {
-    res.status(+err.status || 500).send(err.response ? err.response.data : {
-      message: 'Failed to send sample message'
-    })
-  })
-})
 
 app.use((err, req, res, next) => {
   res.status(+err.status || 500).send({
@@ -109,7 +38,7 @@ async function pullMembers (device) {
     return cache.members.data
   }
   const url = `${API_URL}/devices/${device.id}/team`
-  const { data: members } = await axios.get(url, { headers: { Authorization: config.apiKey } })
+  const { data: members } = await axios.get(url, { headers: { Authorization: process.env.API_KEY } })
   cache.members = { data: members, time: Date.now() }
   return members
 }
@@ -146,7 +75,7 @@ async function createLabels (device) {
       description: 'Automatically created label for the chatbot'
     }
     try {
-      await axios.post(url, body, { headers: { Authorization: config.apiKey } })
+      await axios.post(url, body, { headers: { Authorization: process.env.API_KEY } })
     } catch (err) {
       console.error('[error] failed to create label:', label, err.message)
     }
@@ -161,7 +90,7 @@ async function pullLabels (device, { force } = {}) {
     return cache.labels.data
   }
   const url = `${API_URL}/devices/${device.id}/labels`
-  const { data: labels } = await axios.get(url, { headers: { Authorization: config.apiKey } })
+  const { data: labels } = await axios.get(url, { headers: { Authorization: process.env.API_KEY } })
   cache.labels = { data: labels, time: Date.now() }
   return labels
 }
@@ -176,7 +105,7 @@ async function updateChatLabels ({ data, device, labels }) {
   }
   if (newLabels.length) {
     console.log('[info] update chat labels:', data.chat.id, newLabels)
-    await axios.patch(url, newLabels, { headers: { Authorization: config.apiKey } })
+    await axios.patch(url, newLabels, { headers: { Authorization: process.env.API_KEY } })
   }
 }
 
@@ -200,7 +129,7 @@ async function updateChatMetadata ({ data, device, metadata }) {
     }
   }
   if (entries.length) {
-    await axios.patch(url, entries, { headers: { Authorization: config.apiKey } })
+    await axios.patch(url, entries, { headers: { Authorization: process.env.API_KEY } })
   }
 }
 
@@ -235,7 +164,7 @@ async function selectAssignMember (device) {
 async function assignChat ({ member, data, device }) {
   const url = `${API_URL}/chat/${device.id}/chats/${data.chat.id}/owner`
   const body = { agent: member.id }
-  await axios.patch(url, body, { headers: { Authorization: config.apiKey } })
+  await axios.patch(url, body, { headers: { Authorization: process.env.API_KEY } })
 
   if (config.setMetadataOnAssignment && config.setMetadataOnAssignment.length) {
     const metadata = config.setMetadataOnAssignment.filter(entry => entry && entry.key && entry.value).map(({ key, value }) => ({ key, value }))
@@ -293,7 +222,7 @@ async function assignChatToAgent ({ data, device }) {
 async function unassignChat ({ data, device }) {
   try {
     const url = `${API_URL}/chat/${device.id}/chats/${data.chat.id}/owner`
-    await axios.delete(url, null, { headers: { Authorization: config.apiKey } })
+    await axios.delete(url, null, { headers: { Authorization: process.env.API_KEY } })
   } catch (err) {
     console.error('[error] failed to unassign chat:', data.id, data.chat.id, err)
   }
@@ -853,7 +782,7 @@ async function sendMessage ({ phone, message, media, device, ...fields }) {
     retries -= 1
     try {
       const res = await axios.post(url, body, {
-        headers: { Authorization: config.apiKey }
+        headers: { Authorization: process.env.API_KEY }
       })
       console.log('[info] Message sent:', phone, res.data.id, res.data.status)
       return res.data
@@ -868,13 +797,13 @@ async function sendMessage ({ phone, message, media, device, ...fields }) {
 async function loadDevice () {
   const url = `${API_URL}/devices`
   const { data } = await axios.get(url, {
-    headers: { Authorization: config.apiKey }
+    headers: { Authorization: process.env.API_KEY }
   })
-  if (config.device && !config.device.includes(' ')) {
-    if (/^[a-f0-9]{24}$/i.test(config.device) === false) {
+  if (process.env.DEVICE && !process.env.DEVICE.includes(' ')) {
+    if (/^[a-f0-9]{24}$/i.test(process.env.DEVICE) === false) {
       return exit('Invalid WhatsApp device ID: must be 24 characers hexadecimal value. Get the device ID here: https://app.wassenger.com/number')
     }
-    return data.find(device => device.id === config.device)
+    return data.find(device => device.id === process.env.DEVICE)
   }
   return data.find(device => device.status === 'operative')
 }
@@ -886,7 +815,7 @@ async function registerWebhook (tunnel, device) {
 
   const url = `${API_URL}/webhooks`
   const { data: webhooks } = await axios.get(url, {
-    headers: { Authorization: config.apiKey }
+    headers: { Authorization: process.env.API_KEY }
   })
 
   const findWebhook = webhook => {
@@ -908,7 +837,7 @@ async function registerWebhook (tunnel, device) {
     // Delete previous ngrok webhooks
     if (webhook.url.includes('ngrok-free.app') || webhook.url.startsWith(tunnel)) {
       const url = `${API_URL}/webhooks/${webhook.id}`
-      await axios.delete(url, { headers: { Authorization: config.apiKey } })
+      await axios.delete(url, { headers: { Authorization: process.env.API_KEY } })
     }
   }
 
@@ -921,7 +850,7 @@ async function registerWebhook (tunnel, device) {
   }
 
   const { data: webhook } = await axios.post(url, data, {
-    headers: { Authorization: config.apiKey }
+    headers: { Authorization: process.env.API_KEY }
   })
 
   return webhook
@@ -935,8 +864,8 @@ async function createTunnel () {
     retries -= 1
     try {
       const tunnel = await ngrok.connect({
-        addr: config.port,
-        authtoken: config.ngrokToken
+        addr: process.env.PORT,
+        authtoken: process.env.NGROK_TOKEN
       })
       console.log(`Ngrok tunnel created: ${tunnel}`)
       return tunnel
@@ -975,12 +904,12 @@ function exit (msg, ...args) {
 // Initialize chatbot server
 async function main () {
   // API key must be provided
-  if (!config.apiKey || config.apiKey.length < 60) {
+  if (!process.env.API_KEY || process.env.API_KEY.length < 60) {
     return exit('Please sign up in Wassenger and obtain your API key here:\nhttps://app.wassenger.com/apikeys')
   }
 
   // Create dev mode server with Ngrok tunnel and nodemon
-  if (env.DEV === 'true' && !config.production) {
+  if (process.env.PRODUCTION == 'production') {
     return devServer()
   }
 
@@ -1012,23 +941,23 @@ async function main () {
   console.log('[info] Using WhatsApp connected number:', device.phone, device.alias, `(ID = ${device.id})`)
 
   // Start server
-  await app.listen(config.port, () => {
-    console.log(`Server listening on port ${config.port}`)
+  await app.listen(process.env.PORT, () => {
+    console.log(`Server listening on port ${process.env.PORT}`)
   })
 
-  if (config.production) {
+  if (process.env.PRODUCTION) {
     console.log('[info] Validating webhook endpoint...')
-    if (!config.webhookUrl) {
+    if (!process.env.WEBHOOK_URL) {
       return exit('Missing required environment variable: WEBHOOK_URL must be present in production mode')
     }
-    const webhook = await registerWebhook(config.webhookUrl, device)
+    const webhook = await registerWebhook(process.env.WEBHOOK_URL, device)
     if (!webhook) {
       return exit(`Missing webhook active endpoint in production mode: please create a webhook endpoint that points to the chatbot server:\nhttps://app.wassenger.com/${device.id}/webhooks`)
     }
     console.log('[info] Using webhook endpoint in production mode:', webhook.url)
   } else {
     console.log('[info] Registering webhook tunnel...')
-    const tunnel = config.webhookUrl || await createTunnel()
+    const tunnel = process.env.WEBHOOK_URL || await createTunnel()
     const webhook = await registerWebhook(tunnel, device)
     if (!webhook) {
       console.error('Failed to connect webhook. Please try again.')

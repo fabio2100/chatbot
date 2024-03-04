@@ -42,32 +42,6 @@ Give it a try 😁
 
 // Chatbot config
 module.exports = {
-  // Optional. Specify the Wassenger device ID (24 characters hexadecimal length) to be used for the chatbot
-  // If no device is defined, the first connected device will be used
-  // Obtain the device ID in the Wassenger app: https://app.wassenger.com/number
-  device: env.DEVICE || '65a81cc9faf216bdf10ea21b',
-
-  // Required. Specify the Wassenger API key to be used
-  // You can obtain it here: https://app.wassenger.com/apikeys
-  apiKey: env.API_KEY || '113cdc6d2705b188a536743d815095a4ff6394742a406d5f12892b552f83077594c7e4cfcd1f53e9',
-
-  // Optional. HTTP server TCP port to be used. Defaults to 8080
-  port: +env.PORT || 8080,
-
-  // Optional. Use NODE_ENV=production to run the chatbot in production mode
-  production: env.NODE_ENV === 'production',
-
-  // Optional. Specify the webhook public URL to be used for receiving webhook events
-  // If no webhook is specified, the chatbot will autoamtically create an Ngrok tunnel
-  // and register it as the webhook URL.
-  // IMPORTANT: in order to use Ngrok tunnels, you need to sign up for free, see the option below.
-  webhookUrl: env.WEBHOOK_URL,
-
-  // Ngrok tunnel authentication token.
-  // Required if webhook URL is not provided.
-  // sign up for free and get one: https://ngrok.com/signup
-  // Learn how to obtain the auth token: https://ngrok.com/docs/agent/#authtokens
-  ngrokToken: env.NGROK_TOKEN,
 
   // Set one or multiple labels on chatbot-managed chats
   setLabelsOnBotChats: ['bot'],
